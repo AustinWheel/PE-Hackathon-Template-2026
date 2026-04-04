@@ -6,4 +6,10 @@ def register_routes(app):
         app.register_blueprint(products_bp)
     """
     from app.routes.products import products_bp
-    app.register_blueprint(products_bp) 
+    app.register_blueprint(products_bp)
+
+    from app.routes.metrics import metrics_bp
+    app.register_blueprint(metrics_bp)
+
+    from app.routes.logs import logs_bp
+    app.register_blueprint(logs_bp)

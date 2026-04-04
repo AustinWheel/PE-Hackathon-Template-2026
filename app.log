@@ -1,0 +1,46 @@
+{"timestamp": "2026-04-03 21:40:38,360", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/health", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:40:38,383", "level": "INFO", "name": "app", "message": "Health check", "component": "health"}
+{"timestamp": "2026-04-03 21:40:38,384", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/health", "status": 200}
+{"timestamp": "2026-04-03 21:40:38,384", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/products", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:40:38,409", "level": "INFO", "name": "app.routes.products", "message": "Products listed", "component": "products", "count": 0}
+{"timestamp": "2026-04-03 21:40:38,409", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/products", "status": 200}
+{"timestamp": "2026-04-03 21:40:38,410", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:40:38,414", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 28.4, "memory_percent": 84.9, "memory_used_mb": 7065.2, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:40:38,414", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:40:38,415", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/logs", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:40:38,420", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/logs", "status": 200}
+{"timestamp": "2026-04-03 21:45:53,929", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/health", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:45:53,980", "level": "INFO", "name": "app", "message": "Health check", "component": "health"}
+{"timestamp": "2026-04-03 21:45:53,982", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/health", "status": 200}
+{"timestamp": "2026-04-03 21:45:54,028", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/favicon.ico", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:45:54,035", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/favicon.ico", "status": 404}
+{"timestamp": "2026-04-03 21:46:06,326", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:46:06,362", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 0.0, "memory_percent": 84.5, "memory_used_mb": 7099.9, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:46:06,363", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:46:27,531", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:46:27,552", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 100.0, "memory_percent": 83.5, "memory_used_mb": 7126.8, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:46:27,553", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:46:31,548", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:46:31,560", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 41.5, "memory_percent": 83.7, "memory_used_mb": 7149.8, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:46:31,561", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:46:38,199", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:46:38,213", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 34.6, "memory_percent": 83.2, "memory_used_mb": 7093.0, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:46:38,214", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:46:40,735", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:46:40,749", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 34.6, "memory_percent": 84.2, "memory_used_mb": 7148.7, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:46:40,750", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:46:41,985", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:46:42,000", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 0.0, "memory_percent": 84.2, "memory_used_mb": 7080.3, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:46:42,001", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:46:43,400", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:46:43,413", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 33.2, "memory_percent": 84.0, "memory_used_mb": 7099.9, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:46:43,413", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
+{"timestamp": "2026-04-03 21:47:15,980", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/logs", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:47:15,996", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/logs", "status": 200}
+{"timestamp": "2026-04-03 21:47:35,031", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/logs", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:47:35,141", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/logs", "status": 200}
+{"timestamp": "2026-04-03 21:47:39,649", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/logs", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:47:39,689", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/logs", "status": 200}
+{"timestamp": "2026-04-03 21:48:16,074", "level": "INFO", "name": "app", "message": "Request received", "method": "GET", "path": "/metrics", "remote_addr": "127.0.0.1"}
+{"timestamp": "2026-04-03 21:48:16,159", "level": "INFO", "name": "app.routes.metrics", "message": "Metrics collected", "component": "metrics", "cpu_percent": 37.1, "memory_percent": 84.5, "memory_used_mb": 7103.4, "memory_total_mb": 18432.0}
+{"timestamp": "2026-04-03 21:48:16,159", "level": "INFO", "name": "app", "message": "Request completed", "method": "GET", "path": "/metrics", "status": 200}
