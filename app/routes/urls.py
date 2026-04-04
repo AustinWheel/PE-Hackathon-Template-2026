@@ -48,6 +48,14 @@ def create_url():
         })
         return jsonify({"error": "original_url and user_id are required"}), 400
 
+    # Validate original_url format
+    if not isinstance(data["original_url"], str) or not data["original_url"].startswith(("http://", "https://")):
+        return jsonify({"error": "original_url must be a valid URL starting with http:// or https://"}), 400
+
+    # Validate user_id is an integer
+    if not isinstance(data["user_id"], int):
+        return jsonify({"error": "user_id must be an integer"}), 400
+
     try:
         user = User.get_by_id(data["user_id"])
     except User.DoesNotExist:
@@ -141,25 +149,43 @@ def get_url(url_id):
 
 @urls_bp.route("/urls/<int:url_id>", methods=["PUT"])
 def update_url(url_id):
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+
     try:
         url = Url.get_by_id(url_id)
     except Url.DoesNotExist:
         logger.warning("URL not found for update", extra={"component": "urls", "url_id": url_id})
         return jsonify({"error": "URL not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
         return jsonify({"error": "Request body is required"}), 400
 
+    changes = {}
     if "title" in data:
         url.title = data["title"]
+        changes["title"] = data["title"]
     if "is_active" in data:
         url.is_active = data["is_active"]
+        changes["is_active"] = data["is_active"]
     if "original_url" in data:
+        if not isinstance(data["original_url"], str) or not data["original_url"].startswith(("http://", "https://")):
+            return jsonify({"error": "original_url must be a valid URL starting with http:// or https://"}), 400
         url.original_url = data["original_url"]
+        changes["original_url"] = data["original_url"]
 
     url.updated_at = datetime.utcnow()
     url.save()
+
+    # Log update event (Unseen Observer)
+    Event.create(
+        url=url,
+        user=url.user,
+        event_type="updated",
+        timestamp=datetime.utcnow(),
+        details=json.dumps(changes),
+    )
 
     logger.info("URL updated", extra={"component": "urls", "url_id": url_id})
     return jsonify(_url_to_dict(url))
@@ -172,6 +198,15 @@ def delete_url(url_id):
     except Url.DoesNotExist:
         logger.warning("URL not found for delete", extra={"component": "urls", "url_id": url_id})
         return jsonify({"error": "URL not found"}), 404
+
+    # Log deletion event before deleting (Unseen Observer)
+    Event.create(
+        url=url,
+        user=url.user,
+        event_type="deleted",
+        timestamp=datetime.utcnow(),
+        details=json.dumps({"short_code": url.short_code, "original_url": url.original_url}),
+    )
 
     url.delete_instance()
     logger.info("URL deleted", extra={"component": "urls", "url_id": url_id})

@@ -70,8 +70,13 @@ def create_event():
 
     if "url_id" not in data:
         errors["url_id"] = "url_id is required"
+    elif not isinstance(data["url_id"], int):
+        errors["url_id"] = "url_id must be an integer"
+
     if "user_id" not in data:
         errors["user_id"] = "user_id is required"
+    elif not isinstance(data["user_id"], int):
+        errors["user_id"] = "user_id must be an integer"
 
     # Validate details is a dict if provided
     if "details" in data and data["details"] is not None:

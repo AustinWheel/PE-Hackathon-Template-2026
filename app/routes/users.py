@@ -1,12 +1,15 @@
 import csv
 import io
 import logging
+import re
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
 from app.database import db
 from app.models.user import User
+
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 logger = logging.getLogger(__name__)
 users_bp = Blueprint("users", __name__)
@@ -98,6 +101,8 @@ def create_user():
         errors["email"] = "email is required"
     elif not isinstance(data["email"], str):
         errors["email"] = "email must be a string"
+    elif not EMAIL_REGEX.match(data["email"]):
+        errors["email"] = "email must be a valid email address"
 
     if errors:
         logger.warning("Invalid user data", extra={"component": "users", "errors": errors})
@@ -123,23 +128,38 @@ def create_user():
 
 @users_bp.route("/users/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+
     try:
         user = User.get_by_id(user_id)
     except User.DoesNotExist:
         logger.warning("User not found for update", extra={"component": "users", "user_id": user_id})
         return jsonify({"error": "User not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
         return jsonify({"error": "Request body is required"}), 400
 
     if "username" in data:
         if not isinstance(data["username"], str):
             return jsonify({"errors": {"username": "username must be a string"}}), 400
+        # Check uniqueness against other users
+        conflict = User.select().where(
+            (User.username == data["username"]) & (User.id != user_id)
+        ).first()
+        if conflict:
+            return jsonify({"error": "A user with that username already exists"}), 409
         user.username = data["username"]
     if "email" in data:
         if not isinstance(data["email"], str):
             return jsonify({"errors": {"email": "email must be a string"}}), 400
+        # Check uniqueness against other users
+        conflict = User.select().where(
+            (User.email == data["email"]) & (User.id != user_id)
+        ).first()
+        if conflict:
+            return jsonify({"error": "A user with that email already exists"}), 409
         user.email = data["email"]
 
     user.save()
