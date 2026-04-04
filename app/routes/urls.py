@@ -34,13 +34,27 @@ def _url_to_dict(url):
 
 @urls_bp.route("/urls", methods=["POST"])
 def create_url():
-    data = request.get_json()
-    if not data or "original_url" not in data or "user_id" not in data:
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
+        return jsonify({"error": "Request body is required"}), 400
+
+    if "original_url" not in data or "user_id" not in data:
         logger.warning("Invalid create URL request", extra={
             "component": "urls",
             "error": "missing original_url or user_id",
         })
         return jsonify({"error": "original_url and user_id are required"}), 400
+
+    # Validate original_url format
+    if not isinstance(data["original_url"], str) or not data["original_url"].startswith(("http://", "https://")):
+        return jsonify({"error": "original_url must be a valid URL starting with http:// or https://"}), 400
+
+    # Validate user_id is an integer
+    if not isinstance(data["user_id"], int):
+        return jsonify({"error": "user_id must be an integer"}), 400
 
     try:
         user = User.get_by_id(data["user_id"])
@@ -50,6 +64,13 @@ def create_url():
             "user_id": data["user_id"],
         })
         return jsonify({"error": "User not found"}), 404
+
+    # Duplicate prevention
+    existing = Url.select().where(
+        (Url.user == user) & (Url.original_url == data["original_url"])
+    ).first()
+    if existing:
+        return jsonify({"error": "This user already has a URL with that original_url"}), 409
 
     short_code = _generate_short_code()
     now = datetime.utcnow()
@@ -89,7 +110,8 @@ def list_urls():
     from app.cache import cache_get, cache_set
 
     user_id = request.args.get("user_id", type=int)
-    cache_key = f"urls:list:{user_id or 'all'}"
+    is_active_param = request.args.get("is_active")
+    cache_key = f"urls:list:{user_id or 'all'}:{is_active_param or 'all'}"
 
     cached = cache_get(cache_key)
     if cached is not None:
@@ -99,6 +121,9 @@ def list_urls():
     query = Url.select()
     if user_id:
         query = query.where(Url.user == user_id)
+    if is_active_param is not None:
+        is_active = is_active_param.lower() in ("true", "1", "yes")
+        query = query.where(Url.is_active == is_active)
 
     results = [_url_to_dict(u) for u in query]
     cache_set(cache_key, results, ttl=30)
@@ -124,32 +149,78 @@ def get_url(url_id):
 
 @urls_bp.route("/urls/<int:url_id>", methods=["PUT"])
 def update_url(url_id):
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+
     try:
         url = Url.get_by_id(url_id)
     except Url.DoesNotExist:
         logger.warning("URL not found for update", extra={"component": "urls", "url_id": url_id})
         return jsonify({"error": "URL not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
         return jsonify({"error": "Request body is required"}), 400
 
+    changes = {}
     if "title" in data:
         url.title = data["title"]
+        changes["title"] = data["title"]
     if "is_active" in data:
         url.is_active = data["is_active"]
+        changes["is_active"] = data["is_active"]
     if "original_url" in data:
+        if not isinstance(data["original_url"], str) or not data["original_url"].startswith(("http://", "https://")):
+            return jsonify({"error": "original_url must be a valid URL starting with http:// or https://"}), 400
         url.original_url = data["original_url"]
+        changes["original_url"] = data["original_url"]
 
     url.updated_at = datetime.utcnow()
     url.save()
+
+    # Log update event (Unseen Observer)
+    Event.create(
+        url=url,
+        user=url.user,
+        event_type="updated",
+        timestamp=datetime.utcnow(),
+        details=json.dumps(changes),
+    )
 
     logger.info("URL updated", extra={"component": "urls", "url_id": url_id})
     return jsonify(_url_to_dict(url))
 
 
-@urls_bp.route("/r/<short_code>")
-def redirect_short(short_code):
+@urls_bp.route("/urls/<int:url_id>", methods=["DELETE"])
+def delete_url(url_id):
+    try:
+        url = Url.get_by_id(url_id)
+    except Url.DoesNotExist:
+        logger.warning("URL not found for delete", extra={"component": "urls", "url_id": url_id})
+        return jsonify({"error": "URL not found"}), 404
+
+    # Log deletion event before deleting (Unseen Observer)
+    Event.create(
+        url=url,
+        user=url.user,
+        event_type="deleted",
+        timestamp=datetime.utcnow(),
+        details=json.dumps({"short_code": url.short_code, "original_url": url.original_url}),
+    )
+
+    url.delete_instance()
+    logger.info("URL deleted", extra={"component": "urls", "url_id": url_id})
+    return jsonify({"message": "URL deleted"}), 200
+
+
+@urls_bp.route("/urls/<short_code>/redirect")
+def redirect_by_short_code(short_code):
+    """Redirect via /urls/<short_code>/redirect (test harness expects this pattern)."""
+    return _do_redirect(short_code)
+
+
+def _do_redirect(short_code):
+    """Shared redirect logic for both /r/<code> and /urls/<code>/redirect."""
     try:
         url = Url.get(Url.short_code == short_code)
     except Url.DoesNotExist:
@@ -185,3 +256,8 @@ def redirect_short(short_code):
     })
 
     return redirect(url.original_url)
+
+
+@urls_bp.route("/r/<short_code>")
+def redirect_short(short_code):
+    return _do_redirect(short_code)
