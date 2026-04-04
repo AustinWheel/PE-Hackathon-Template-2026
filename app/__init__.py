@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 import time
 
@@ -94,9 +95,32 @@ def create_app():
 
     register_routes(app)
 
+    app._start_time = time.time()
+
     @app.route("/health")
     def health():
+        from app.database import db
+
+        health_data = {
+            "status": "ok",
+            "version": os.environ.get("APP_VERSION", "0.1.0"),
+            "uptime_seconds": round(time.time() - app._start_time, 1),
+        }
+
+        # Check database connectivity
+        try:
+            db.connect(reuse_if_open=True)
+            db.execute_sql("SELECT 1")
+            health_data["database"] = "connected"
+        except Exception as e:
+            health_data["status"] = "degraded"
+            health_data["database"] = f"error: {str(e)}"
+            app.logger.error("Health check: DB unreachable", extra={
+                "component": "health", "error": str(e),
+            })
+            return jsonify(health_data), 503
+
         app.logger.info("Health check", extra={"component": "health"})
-        return jsonify(status="ok")
+        return jsonify(health_data)
 
     return app

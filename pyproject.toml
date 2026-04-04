@@ -13,3 +13,9 @@ dependencies = [
     "python-dotenv>=1.0",
     "python-json-logger>=4.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
+]
