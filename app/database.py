@@ -18,13 +18,14 @@ def init_db(app):
     if database_url:
         # DigitalOcean / production — use the connection string
         parsed = urlparse(database_url)
+        sslmode = os.environ.get("DATABASE_SSLMODE", "require")
         database = PostgresqlDatabase(
             parsed.path.lstrip("/"),
             host=parsed.hostname,
             port=parsed.port or 5432,
             user=parsed.username,
             password=parsed.password,
-            sslmode="require",
+            sslmode=sslmode,
         )
     else:
         # Local development — use individual env vars
