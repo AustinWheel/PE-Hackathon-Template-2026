@@ -17,8 +17,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/hackathon_db
       - DATABASE_SSLMODE=disable
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   app2:
@@ -26,8 +29,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/hackathon_db
       - DATABASE_SSLMODE=disable
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   app3:
@@ -35,8 +41,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/hackathon_db
       - DATABASE_SSLMODE=disable
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # --- Database ---
@@ -50,6 +59,17 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Redis Cache ---
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5

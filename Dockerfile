@@ -13,6 +13,6 @@ RUN uv sync --frozen --no-dev
 
 COPY . .
 
-EXPOSE 5001
+EXPOSE 8080
 
-CMD ["uv", "run", "gunicorn", "run:app", "--bind", "0.0.0.0:5001", "--workers", "4", "--timeout", "30", "--preload"]
+CMD ["uv", "run", "gunicorn", "run:app", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "30", "--preload"]

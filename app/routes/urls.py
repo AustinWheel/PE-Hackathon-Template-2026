@@ -86,13 +86,23 @@ def create_url():
 
 @urls_bp.route("/urls")
 def list_urls():
+    from app.cache import cache_get, cache_set
+
     user_id = request.args.get("user_id", type=int)
+    cache_key = f"urls:list:{user_id or 'all'}"
+
+    cached = cache_get(cache_key)
+    if cached is not None:
+        logger.info("URLs listed (cache hit)", extra={"component": "urls", "user_id": user_id})
+        return jsonify(cached)
+
     query = Url.select()
     if user_id:
         query = query.where(Url.user == user_id)
 
     results = [_url_to_dict(u) for u in query]
-    logger.info("URLs listed", extra={
+    cache_set(cache_key, results, ttl=30)
+    logger.info("URLs listed (cache miss)", extra={
         "component": "urls",
         "count": len(results),
         "user_id": user_id,

@@ -46,15 +46,24 @@ def bulk_upload_users():
 
 @users_bp.route("/users")
 def list_users():
+    from app.cache import cache_get, cache_set
+
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 50, type=int)
+    cache_key = f"users:list:{page}:{per_page}"
+
+    cached = cache_get(cache_key)
+    if cached is not None:
+        logger.info("Users listed (cache hit)", extra={"component": "users", "page": page})
+        return jsonify(cached)
 
     query = User.select().order_by(User.id)
     total = query.count()
     users = query.paginate(page, per_page)
 
     result = [_user_to_dict(u) for u in users]
-    logger.info("Users listed", extra={"component": "users", "count": len(result), "page": page})
+    cache_set(cache_key, result, ttl=30)
+    logger.info("Users listed (cache miss)", extra={"component": "users", "count": len(result), "page": page})
     return jsonify(result)
 
 
