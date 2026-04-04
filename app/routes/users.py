@@ -170,12 +170,19 @@ def update_user(user_id):
 
 @users_bp.route("/users/<int:user_id>", methods=["DELETE"])
 def delete_user(user_id):
+    from app.models.url import Url
+    from app.models.event import Event
+
     try:
         user = User.get_by_id(user_id)
     except User.DoesNotExist:
         logger.warning("User not found for delete", extra={"component": "users", "user_id": user_id})
         return jsonify({"error": "User not found"}), 404
 
+    # Delete related records first (FK constraints)
+    Event.delete().where(Event.user == user).execute()
+    Url.delete().where(Url.user == user).execute()
     user.delete_instance()
+
     logger.info("User deleted", extra={"component": "users", "user_id": user_id})
     return jsonify({"message": "User deleted"}), 200

@@ -199,16 +199,10 @@ def delete_url(url_id):
         logger.warning("URL not found for delete", extra={"component": "urls", "url_id": url_id})
         return jsonify({"error": "URL not found"}), 404
 
-    # Log deletion event before deleting (Unseen Observer)
-    Event.create(
-        url=url,
-        user=url.user,
-        event_type="deleted",
-        timestamp=datetime.utcnow(),
-        details=json.dumps({"short_code": url.short_code, "original_url": url.original_url}),
-    )
-
+    # Delete related events first (FK constraint), then the URL
+    Event.delete().where(Event.url == url).execute()
     url.delete_instance()
+
     logger.info("URL deleted", extra={"component": "urls", "url_id": url_id})
     return jsonify({"message": "URL deleted"}), 200
 
