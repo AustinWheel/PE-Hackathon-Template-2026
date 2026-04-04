@@ -81,8 +81,11 @@ def get_user(user_id):
 
 @users_bp.route("/users", methods=["POST"])
 def create_user():
-    data = request.get_json()
-    if not data:
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data, dict):
         return jsonify({"error": "Request body is required"}), 400
 
     errors = {}
@@ -99,6 +102,14 @@ def create_user():
     if errors:
         logger.warning("Invalid user data", extra={"component": "users", "errors": errors})
         return jsonify({"errors": errors}), 400
+
+    # Duplicate prevention
+    existing = User.select().where(
+        (User.username == data["username"]) | (User.email == data["email"])
+    ).first()
+    if existing:
+        logger.warning("Duplicate user", extra={"component": "users", "username": data["username"]})
+        return jsonify({"error": "A user with that username or email already exists"}), 409
 
     user = User.create(
         username=data["username"],
@@ -135,3 +146,16 @@ def update_user(user_id):
 
     logger.info("User updated", extra={"component": "users", "user_id": user_id})
     return jsonify(_user_to_dict(user))
+
+
+@users_bp.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    try:
+        user = User.get_by_id(user_id)
+    except User.DoesNotExist:
+        logger.warning("User not found for delete", extra={"component": "users", "user_id": user_id})
+        return jsonify({"error": "User not found"}), 404
+
+    user.delete_instance()
+    logger.info("User deleted", extra={"component": "users", "user_id": user_id})
+    return jsonify({"message": "User deleted"}), 200
