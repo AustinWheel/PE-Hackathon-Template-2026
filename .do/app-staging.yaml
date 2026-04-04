@@ -28,15 +28,9 @@ services:
         value: "staging"
       - key: LOKI_URL
         value: "http://143.198.173.164:3100"
-      - key: REDIS_URL
-        value: ${redis.REDIS_URL}
-
 databases:
   - name: db
     engine: PG
     version: "16"
     size: db-s-1vcpu-1gb
     num_nodes: 1
-  - name: redis
-    engine: REDIS
-    version: "7"

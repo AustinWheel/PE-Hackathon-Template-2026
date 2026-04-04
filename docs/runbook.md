@@ -1,132 +1,172 @@
 # Incident Runbook
 
-## How to use this doc
 When an alert fires at 3 AM, open this page. Find the alert name. Follow the steps. Don't think — just do.
 
 ## Access
 
 | System | URL | Credentials |
 |--------|-----|-------------|
-| App | https://pe-hackathon-muy5v.ondigitalocean.app | — |
+| Prod NYC | https://pe-hackathon-muy5v.ondigitalocean.app | — |
+| Prod SFO | https://pe-hackathon-prod-sfo-wkpqr.ondigitalocean.app | — |
+| Staging | https://pe-hackathon-staging-f28oj.ondigitalocean.app | — |
 | Grafana | http://143.198.173.164:3000 | admin / admin |
 | Prometheus | http://143.198.173.164:9090 | — |
 | Alertmanager | http://143.198.173.164:9093 | — |
+| Loki | http://143.198.173.164:3100 | — |
 | DO Dashboard | https://cloud.digitalocean.com/apps | DO account |
-| App Logs | https://pe-hackathon-muy5v.ondigitalocean.app/logs | — |
+
+### App IDs (for doctl)
+```
+prod-nyc:  1c0e8082-1afa-4fa0-a941-4877f46f6a48
+prod-sfo:  baf4705a-d8f2-4b58-b3bd-c1f8779a22e5
+staging:   5e2a377f-8cdd-4d0c-a0af-676d7c6ed8f7
+postgres:  dacc1fe1-631a-4746-9bd1-606294a1dc32
+```
 
 ---
 
 ## Alert: ServiceDown
 
-**What it means:** Prometheus cannot reach the app for over 1 minute.
+**What it means:** Prometheus cannot reach an app for over 1 minute. The alert annotation tells you which region.
 
 **Steps:**
 
-1. Check if the app responds:
+1. Which region is down? Check the alert's `region` label.
+2. Check if the app responds:
+   ```bash
+   curl https://pe-hackathon-muy5v.ondigitalocean.app/health      # NYC
+   curl https://pe-hackathon-prod-sfo-wkpqr.ondigitalocean.app/health  # SFO
    ```
-   curl https://pe-hackathon-muy5v.ondigitalocean.app/health
+3. If no response, check DO App Platform:
+   ```bash
+   doctl apps list-deployments <APP_ID> | head -5
+   doctl apps logs <APP_ID> --type=run | tail -30
    ```
-2. If no response, check DigitalOcean App Platform:
-   - Go to https://cloud.digitalocean.com/apps
-   - Check if a deployment is in progress or errored
-   - Check runtime logs for crash errors
-3. If the app crashed, DO will auto-restart it. Wait 2 minutes and re-check.
-4. If it's stuck in a crash loop, check the deploy logs:
+4. If the app crashed, DO auto-restarts it. Wait 2 minutes and re-check.
+5. If stuck in a crash loop, check deploy logs:
+   ```bash
+   doctl apps logs <APP_ID> --type=deploy | tail -30
    ```
-   doctl apps logs 1c0e8082-1afa-4fa0-a941-4877f46f6a48 --type=deploy
+6. If a bad deploy caused it, force a rebuild from last known good:
+   ```bash
+   doctl apps create-deployment <APP_ID> --force-rebuild
    ```
-5. If a bad deploy caused it, roll back:
-   ```
-   doctl apps list-deployments 1c0e8082-1afa-4fa0-a941-4877f46f6a48
-   # Find the last working deployment ID, then:
-   doctl apps create-deployment 1c0e8082-1afa-4fa0-a941-4877f46f6a48 --force-rebuild
-   ```
-6. If the database is down, check DO managed database status:
-   ```
+7. If the database is down:
+   ```bash
    doctl databases get dacc1fe1-631a-4746-9bd1-606294a1dc32
    ```
+
+**Acknowledge:** `curl -X PUT <app-url>/alerts/<id> -H 'Content-Type: application/json' -d '{"status":"acknowledged","acknowledged_by":"your-name","notes":"Investigating"}'`
 
 **Resolved when:** `/health` returns 200 and Prometheus target shows "up".
 
 ---
 
+## Alert: RegionDown
+
+**What it means:** Fewer than 2 production regions are healthy for over 2 minutes.
+
+**Steps:**
+
+1. Check both regions:
+   ```bash
+   curl -s https://pe-hackathon-muy5v.ondigitalocean.app/health
+   curl -s https://pe-hackathon-prod-sfo-wkpqr.ondigitalocean.app/health
+   ```
+2. Check Prometheus targets:
+   ```bash
+   curl -s http://143.198.173.164:9090/api/v1/targets | python3 -c "
+   import json, sys
+   for t in json.load(sys.stdin)['data']['activeTargets']:
+       print(f\"{t['labels']['job']} health={t['health']}\")
+   "
+   ```
+3. If one region is down, the other is still serving traffic. Focus on restoring the downed region.
+4. Follow the ServiceDown steps for the affected region.
+5. If both regions are down, check the database first — it's the shared dependency.
+
+**Resolved when:** Both prod regions show "up" in Prometheus.
+
+---
+
 ## Alert: HighErrorRate
 
-**What it means:** More than 10% of requests are returning 5xx errors over a 2-minute window.
+**What it means:** Over 10% of requests are returning 5xx in a region over a 2-minute window.
 
 **Steps:**
 
-1. Check what's failing — open the logs filtered to errors:
+1. Check Loki for errors (use the deep link in the Discord alert, or):
+   - Grafana → Explore → Loki → `{job="flask-app", region="<region>"} |= "ERROR"`
+2. Or via the app:
+   ```bash
+   curl "<app-url>/logs?level=ERROR&limit=20"
    ```
-   curl "https://pe-hackathon-muy5v.ondigitalocean.app/logs?level=ERROR&limit=20"
-   ```
-2. Look at the `path` and `component` fields to identify which endpoint is broken.
-3. Check Grafana dashboard for patterns:
+3. Look at the `path` and `component` fields to identify which endpoint is broken.
+4. Check Grafana dashboard — filter by the affected region:
    - Is it one endpoint or all of them?
    - Did it start after a deploy?
-   - Is the database healthy? (Check `/health` for `"database": "connected"`)
-4. If it started after a deploy:
-   - Check the latest commit on `main`
-   - Revert or fix and push
-5. If the database is the problem:
-   - Check connection pool (too many connections?)
-   - Check DO database metrics in the cloud console
-6. If it's a traffic spike causing errors:
-   - Check Grafana "Traffic" panel — is there an unusual spike?
-   - Redis may be down — check if cache is working
-   - Scale up instances if needed via `.do/app.yaml`
+   - Is the database healthy?
+5. If it started after a deploy: revert or fix and push.
+6. If Redis is down, caching degrades gracefully but DB load increases — check Redis:
+   ```bash
+   doctl databases list --format Name,Status
+   ```
 
-**Resolved when:** Error rate drops below 10% on Grafana dashboard.
+**Resolved when:** Error rate drops below 10% on Grafana.
 
 ---
 
-## Alert: High CPU (if configured)
+## Alert: HighLatencyP95
 
-**What it means:** CPU usage above 90% for sustained period.
+**What it means:** P95 response time is above 2 seconds for over 2 minutes.
 
 **Steps:**
 
-1. Check `/metrics` to confirm:
-   ```
-   curl https://pe-hackathon-muy5v.ondigitalocean.app/metrics
-   ```
-2. Check Grafana "Saturation" panel — is it sustained or a spike?
-3. If sustained:
-   - Check if someone triggered `/chaos/cpu` (look in logs)
-   - Check for runaway queries or infinite loops in recent deploys
-4. If it's legitimate traffic, consider scaling:
-   - Increase `instance_count` in `.do/app.yaml`
-   - Or increase `instance_size_slug` from `basic-xxs` to `basic-xs`
+1. Check Grafana Latency panel — which endpoints are slow?
+2. Check if it's a CPU issue: Grafana Saturation panel.
+3. If CPU is high, autoscaling should kick in (3→15 instances). Wait 2-3 minutes.
+4. If it's database-related, check for slow queries in logs.
+5. Check if Redis is healthy — cache misses cause DB load.
+
+**Resolved when:** P95 latency drops below 2s.
 
 ---
 
-## General: How to check system health quickly
+## Quick Health Check (copy-paste this)
 
 ```bash
-# App health
-curl https://pe-hackathon-muy5v.ondigitalocean.app/health
+echo "=== Prod NYC ===" && curl -s https://pe-hackathon-muy5v.ondigitalocean.app/health | python3 -m json.tool
+echo "=== Prod SFO ===" && curl -s https://pe-hackathon-prod-sfo-wkpqr.ondigitalocean.app/health | python3 -m json.tool
+echo "=== Staging ===" && curl -s https://pe-hackathon-staging-f28oj.ondigitalocean.app/health | python3 -m json.tool
+echo "=== Prometheus Targets ===" && curl -s http://143.198.173.164:9090/api/v1/targets | python3 -c "import json,sys; [print(f\"{t['labels']['job']} {t['health']}\") for t in json.load(sys.stdin)['data']['activeTargets']]"
+echo "=== Active Alerts ===" && curl -s http://143.198.173.164:9093/api/v2/alerts | python3 -c "import json,sys; alerts=json.load(sys.stdin); print(f'{len(alerts)} active') if alerts else print('none')"
+```
 
-# System metrics
-curl https://pe-hackathon-muy5v.ondigitalocean.app/metrics
+## Chaos Monkey
 
-# Recent errors
-curl "https://pe-hackathon-muy5v.ondigitalocean.app/logs?level=ERROR&limit=10"
+The chaos monkey runs every 30 minutes on the monitoring Droplet. If you're investigating an alert and suspect it's from the chaos monkey:
 
-# Prometheus targets
-curl http://143.198.173.164:9090/api/v1/targets
+```bash
+ssh root@143.198.173.164 "journalctl -u chaos-monkey --no-pager -n 10"
+```
 
-# Active alerts
-curl http://143.198.173.164:9093/api/v2/alerts
+To disable temporarily:
+```bash
+ssh root@143.198.173.164 "systemctl stop chaos-monkey.timer"
+```
+
+To re-enable:
+```bash
+ssh root@143.198.173.164 "systemctl start chaos-monkey.timer"
 ```
 
 ## Escalation
 
-If the above steps don't resolve the issue:
-1. Check Discord for any messages from teammates
+1. Check Discord for messages from teammates
 2. Check DigitalOcean status page: https://status.digitalocean.com
-3. SSH into monitoring droplet if Prometheus/Grafana are down:
-   ```
+3. If monitoring Droplet is down:
+   ```bash
    ssh root@143.198.173.164
-   docker compose ps
+   cd /root/monitoring && docker compose ps
    docker compose restart
    ```

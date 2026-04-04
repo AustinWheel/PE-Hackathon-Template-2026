@@ -2,22 +2,42 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# Load alert rules
 rule_files:
   - "alert_rules.yml"
 
-# Tell Prometheus where Alertmanager is running
 alerting:
   alertmanagers:
     - static_configs:
         - targets:
             - alertmanager:9093
 
-# Scrape your Flask app
 scrape_configs:
-  - job_name: "flask-app"
+  - job_name: "flask-prod-nyc"
     metrics_path: "/prom-metrics"
     scheme: https
     static_configs:
       - targets:
           - pe-hackathon-muy5v.ondigitalocean.app
+        labels:
+          region: "nyc"
+          environment: "prod"
+
+  - job_name: "flask-prod-sfo"
+    metrics_path: "/prom-metrics"
+    scheme: https
+    static_configs:
+      - targets:
+          - pe-hackathon-prod-sfo-wkpqr.ondigitalocean.app
+        labels:
+          region: "sfo"
+          environment: "prod"
+
+  - job_name: "flask-staging"
+    metrics_path: "/prom-metrics"
+    scheme: https
+    static_configs:
+      - targets:
+          - pe-hackathon-staging-f28oj.ondigitalocean.app
+        labels:
+          region: "nyc"
+          environment: "staging"

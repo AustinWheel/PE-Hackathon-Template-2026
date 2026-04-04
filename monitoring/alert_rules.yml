@@ -1,26 +1,51 @@
 groups:
   - name: app_alerts
     rules:
-      # SERVICE DOWN: fires if Prometheus cannot scrape the app for 1 minute
       - alert: ServiceDown
-        expr: up{job="flask-app"} == 0
+        expr: up == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Service Down - Flask app is unreachable"
-          description: "The Flask app on port 5001 has been unreachable for over 1 minute."
+          summary: "Service Down — {{ $labels.job }} is unreachable"
+          description: "{{ $labels.job }} ({{ $labels.region }}) has been unreachable for over 1 minute."
+          dashboard_url: "http://143.198.173.164:3000/d/overview"
+          logs_url: "http://143.198.173.164:3000/explore?orgId=1&left=%7B%22datasource%22:%22Loki%22,%22queries%22:%5B%7B%22expr%22:%22%7Bjob%3D%5C%22flask-app%5C%22,region%3D%5C%22{{ $labels.region }}%5C%22%7D%22%7D%5D%7D"
+          runbook_url: "https://github.com/AustinWheel/PE-Hackathon-Template-2026/blob/main/docs/runbook.md#alert-servicedown"
 
-      # HIGH ERROR RATE: fires if >10% of requests are 5xx over a 2-minute window
       - alert: HighErrorRate
         expr: |
           (
-            sum(rate(http_errors_total[2m]))
-            / clamp_min(sum(rate(http_requests_total[2m])), 0.001)
+            sum by (job, region, environment) (rate(http_errors_total[2m]))
+            / clamp_min(sum by (job, region, environment) (rate(http_requests_total[2m])), 0.001)
           ) > 0.10
         for: 30s
         labels:
           severity: warning
         annotations:
-          summary: "High Error Rate - Over 10% of requests are failing"
-          description: "More than 10% of HTTP requests have returned 5xx status codes over the last 2 minutes."
+          summary: "High Error Rate in {{ $labels.region }} ({{ $labels.environment }})"
+          description: "Over 10% of requests are returning 5xx in {{ $labels.job }}."
+          dashboard_url: "http://143.198.173.164:3000/d/overview"
+          runbook_url: "https://github.com/AustinWheel/PE-Hackathon-Template-2026/blob/main/docs/runbook.md#alert-higherrorrate"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, job, region, environment) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency above 2s in {{ $labels.region }}"
+          dashboard_url: "http://143.198.173.164:3000/d/overview"
+
+      - alert: RegionDown
+        expr: count(up{environment="prod"} == 1) < 2
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Fewer than 2 production regions are healthy"
+          description: "One or more production regions are completely unreachable."
+          runbook_url: "https://github.com/AustinWheel/PE-Hackathon-Template-2026/blob/main/docs/runbook.md#alert-servicedown"
