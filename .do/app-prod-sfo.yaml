@@ -1,0 +1,48 @@
+name: pe-hackathon-prod-sfo
+region: sfo3
+
+services:
+  - name: api
+    github:
+      repo: AustinWheel/PE-Hackathon-Template-2026
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    http_port: 8080
+    instance_count: 3
+    instance_size_slug: basic-xs
+    autoscaling:
+      min_instance_count: 3
+      max_instance_count: 15
+      metrics:
+        cpu:
+          percent: 70
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 3
+    envs:
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: APP_REGION
+        value: "sfo"
+      - key: APP_ENVIRONMENT
+        value: "prod"
+      - key: LOKI_URL
+        value: "http://143.198.173.164:3100"
+      - key: REDIS_URL
+        value: ${redis.REDIS_URL}
+
+databases:
+  - name: db
+    cluster_name: hackathon-db
+    engine: PG
+    version: "16"
+    production: true
+  - name: redis
+    engine: REDIS
+    version: "7"

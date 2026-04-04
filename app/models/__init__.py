@@ -3,3 +3,4 @@ from app.models.user import User
 from app.models.url import Url
 from app.models.event import Event
 from app.models.product import Product
+from app.models.alert import Alert

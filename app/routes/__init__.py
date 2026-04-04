@@ -28,3 +28,6 @@ def register_routes(app):
 
     from app.routes.events import events_bp
     app.register_blueprint(events_bp)
+
+    from app.routes.alerts import alerts_bp
+    app.register_blueprint(alerts_bp)

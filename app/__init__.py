@@ -2,10 +2,24 @@ import logging
 import os
 import sys
 import time
+import uuid
 
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request
 from pythonjsonlogger import json as json_logger
+
+# Unique per-process instance ID
+INSTANCE_ID = os.environ.get("APP_INSTANCE_ID", str(uuid.uuid4())[:8])
+
+
+class RegionFilter(logging.Filter):
+    """Injects instance_id, region, and environment into every log record."""
+
+    def filter(self, record):
+        record.instance_id = INSTANCE_ID
+        record.region = os.environ.get("APP_REGION", "local")
+        record.environment = os.environ.get("APP_ENVIRONMENT", "dev")
+        return True
 
 
 def setup_logging(app):
@@ -14,16 +28,28 @@ def setup_logging(app):
         rename_fields={"asctime": "timestamp", "levelname": "level"},
     )
 
+    region_filter = RegionFilter()
+
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(formatter)
+    stdout_handler.addFilter(region_filter)
 
     file_handler = logging.FileHandler("app.log")
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(region_filter)
 
     app.logger.handlers.clear()
     app.logger.addHandler(stdout_handler)
     app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
+
+    # Loki handler — only active when LOKI_URL is set
+    from app.loki_handler import create_loki_handler
+    loki_handler = create_loki_handler(formatter=formatter)
+    if loki_handler:
+        loki_handler.addFilter(region_filter)
+        app.logger.addHandler(loki_handler)
+        app.logger.info("Loki log shipping enabled", extra={"component": "logging"})
 
     @app.before_request
     def log_request():
@@ -76,6 +102,11 @@ def create_app():
 
     app = Flask(__name__)
 
+    # Store instance metadata on app for access in routes
+    app.config["APP_INSTANCE_ID"] = INSTANCE_ID
+    app.config["APP_REGION"] = os.environ.get("APP_REGION", "local")
+    app.config["APP_ENVIRONMENT"] = os.environ.get("APP_ENVIRONMENT", "dev")
+
     setup_logging(app)
 
     from app.database import init_db
@@ -89,9 +120,26 @@ def create_app():
     from app.models.url import Url
     from app.models.event import Event
     from app.models.product import Product
+    from app.models.alert import Alert
 
     with app.app_context():
-        db.create_tables([User, Url, Event, Product], safe=True)
+        db.create_tables([User, Url, Event, Product, Alert], safe=True)
+
+    # Rate limiting
+    try:
+        from flask_limiter import Limiter
+        from flask_limiter.util import get_remote_address
+        limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            storage_uri=os.environ.get("REDIS_URL", "memory://"),
+            default_limits=["200 per minute"],
+        )
+        # Exempt monitoring endpoints
+        limiter.exempt(app.view_functions.get("health", lambda: None))
+        app.limiter = limiter
+    except ImportError:
+        app.logger.warning("flask-limiter not installed, rate limiting disabled")
 
     register_routes(app)
 
@@ -105,6 +153,9 @@ def create_app():
             "status": "ok",
             "version": os.environ.get("APP_VERSION", "0.1.0"),
             "uptime_seconds": round(time.time() - app._start_time, 1),
+            "region": app.config["APP_REGION"],
+            "environment": app.config["APP_ENVIRONMENT"],
+            "instance_id": app.config["APP_INSTANCE_ID"],
         }
 
         # Check database connectivity

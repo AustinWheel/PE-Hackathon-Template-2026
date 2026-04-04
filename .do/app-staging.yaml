@@ -1,0 +1,42 @@
+name: pe-hackathon-staging
+region: nyc
+
+services:
+  - name: api
+    github:
+      repo: AustinWheel/PE-Hackathon-Template-2026
+      branch: staging
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 3
+    envs:
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: APP_REGION
+        value: "nyc"
+      - key: APP_ENVIRONMENT
+        value: "staging"
+      - key: LOKI_URL
+        value: "http://143.198.173.164:3100"
+      - key: REDIS_URL
+        value: ${redis.REDIS_URL}
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    size: db-s-1vcpu-1gb
+    num_nodes: 1
+  - name: redis
+    engine: REDIS
+    version: "7"
