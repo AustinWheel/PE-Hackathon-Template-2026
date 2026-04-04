@@ -31,6 +31,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Trigger DigitalOcean deploy
         uses: digitalocean/app_action/deploy@v2
         with:
