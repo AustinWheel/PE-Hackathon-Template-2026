@@ -180,7 +180,12 @@ def delete_user(user_id):
         return jsonify({"error": "User not found"}), 404
 
     # Delete related records first (FK constraints)
+    # 1. Delete events owned by this user
     Event.delete().where(Event.user == user).execute()
+    # 2. Delete events on this user's URLs (from other users clicking them)
+    user_urls = Url.select(Url.id).where(Url.user == user)
+    Event.delete().where(Event.url.in_(user_urls)).execute()
+    # 3. Now safe to delete the URLs
     Url.delete().where(Url.user == user).execute()
     user.delete_instance()
 
