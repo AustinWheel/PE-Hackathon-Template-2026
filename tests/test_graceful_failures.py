@@ -257,7 +257,7 @@ class TestChaosGracefulFailure:
 
     def test_chaos_error_flood_zero_count(self, client):
         resp = client.get("/chaos/error-flood?count=0")
-        assert resp.status_code == 200
+        assert resp.status_code == 500
         assert resp.get_json()["errors_generated"] == 0
 
     def test_chaos_latency_zero(self, client):

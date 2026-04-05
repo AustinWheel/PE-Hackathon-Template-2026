@@ -27,9 +27,9 @@ def test_chaos_health_fail_activates(client):
     assert resp.status_code == 503
 
 
-def test_chaos_error_flood_returns_200(client):
+def test_chaos_error_flood_returns_500(client):
     resp = client.get("/chaos/error-flood?count=5")
-    assert resp.status_code == 200
+    assert resp.status_code == 500
     data = resp.get_json()
     assert data["errors_generated"] == 5
 

@@ -131,7 +131,7 @@ def chaos_kill():
 
 @chaos_bp.route("/chaos/error-flood")
 def chaos_error_flood():
-    """Generate a burst of errors to trigger 'High Error Rate' alerts."""
+    """Generate a burst of 500 errors to trigger 'High Error Rate' alerts."""
     count = min(request.args.get("count", 50, type=int), 200)
     for i in range(count):
         logger.error(
@@ -154,7 +154,7 @@ def chaos_error_flood():
         "chaos": "error_flood",
         "errors_generated": count,
         "status": "complete",
-    })
+    }), 500
 
 
 @chaos_bp.route("/chaos/critical")
