@@ -141,37 +141,27 @@ curl http://localhost:5001/chaos/cpu?duration=30&threads=4
 - Check Alertmanager UI at `localhost:9093` for queued alerts
 - If webhook URL changed: update `monitoring/alertmanager.yml` and restart
 
-## 8. Region Failure (Multi-Region)
+## 8. Redis Failure
 
-**Trigger:** An entire region (NYC or SFO) becomes unreachable — network outage, DO regional issue, or all instances crash.
+**Trigger:** Managed Redis cluster is down or unreachable.
 
 **Detection:**
-- `RegionDown` Prometheus alert fires when fewer than 2 prod regions are healthy for 2+ minutes
-- `ServiceDown` alert fires for the specific region
+- Cache miss rate increases (visible in Loki logs as "cache miss" entries)
+- Latency increases as all requests hit the database directly
+- Rate limiter falls back to in-memory storage
 
 **Behavior:**
-- The healthy region continues serving all traffic via the global load balancer (Cloudflare geo-routing falls back)
-- Database is in NYC; if SFO goes down, no data impact. If NYC goes down, both regions lose DB access but Redis cache serves stale reads.
+- App continues to function — Redis is optional
+- `/products`, `/users`, `/urls` endpoints serve from database instead of cache
+- Rate limiting works per-instance instead of distributed
+- No data loss
 
 **Recovery:**
-- Check DO status page for regional outages
-- If it's a deployment issue, force rebuild: `doctl apps create-deployment <APP_ID> --force-rebuild`
-- If the whole region is down, wait for DO to recover — the other region handles traffic
+- Check DO Dashboard → Databases → hackathon-redis status
+- If Redis is in maintenance: wait for it to complete
+- App auto-reconnects when Redis becomes available again
 
-## 9. Cross-Region Latency
-
-**Trigger:** SFO app instances connecting to NYC database experience ~70ms added latency per query.
-
-**Behavior:**
-- Redis cache absorbs most reads (30s TTL on lists, 60s on products)
-- Cache misses incur the cross-region penalty
-- Write operations always hit NYC (no way around this without multi-primary)
-
-**Mitigation:**
-- Redis is deployed per-region to keep cache local
-- Hot paths (list endpoints) are cached aggressively
-
-## 10. Monitoring Droplet Failure
+## 9. Monitoring Droplet Failure
 
 **Trigger:** The monitoring Droplet (143.198.173.164) goes down.
 
@@ -198,6 +188,5 @@ curl http://localhost:5001/chaos/cpu?duration=30&threads=4
 | Slow response | Latency histogram | Gunicorn worker timeout + restart | 30s |
 | Bad deploy | CI tests fail | Deploy blocked | Immediate |
 | Webhook down | Alertmanager logs | Auto-retry | 4 min |
-| Region down | RegionDown alert | Other region serves traffic | Automatic |
-| Cross-region latency | Latency histogram | Redis cache absorbs reads | N/A |
+| Redis down | Increased latency | Graceful degradation to DB | Automatic |
 | Monitoring down | No alerts firing | SSH + docker compose restart | 1-5 min |

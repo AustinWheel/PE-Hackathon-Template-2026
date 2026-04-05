@@ -12,6 +12,12 @@
 
 set -e
 
+# Load .env if present
+ENV_FILE="$(dirname "$0")/../.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a; source "$ENV_FILE"; set +a
+fi
+
 IP="${MONITORING_IP:-143.198.173.164}"
 USER="${MONITORING_USER:-root}"
 BRANCH="${REPO_BRANCH:-main}"

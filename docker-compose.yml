@@ -14,6 +14,7 @@ services:
   # --- Flask App Instances (3 containers, 4 workers each = 12 workers total) ---
   app1:
     build: .
+    restart: always
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/hackathon_db
       - DATABASE_SSLMODE=disable
@@ -26,6 +27,7 @@ services:
 
   app2:
     build: .
+    restart: always
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/hackathon_db
       - DATABASE_SSLMODE=disable
@@ -38,6 +40,7 @@ services:
 
   app3:
     build: .
+    restart: always
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/hackathon_db
       - DATABASE_SSLMODE=disable

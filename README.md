@@ -184,6 +184,19 @@ query = (Product
          .group_by(Product.category))
 ```
 
+## Production Engineering Documentation
+
+See [`docs/README.md`](docs/README.md) for the full documentation index, including:
+
+- **[Architecture Diagram](docs/README.md#architecture)** — system overview with Mermaid diagram
+- **[Deployment Guide](docs/deployment.md)** — deploy, rollback, manage environments
+- **[Observability Guide](docs/observability/observability.md)** — monitoring, metrics, logging, alerting
+- **[Runbook](docs/observability/runbook.md)** — incident response procedures
+- **[Failure Modes](docs/reliability/failure-modes.md)** — known failures and recovery
+- **[Capacity Plan](docs/scalability/capacity-plan.md)** — scaling strategy and limits
+- **[Decision Log](docs/decisions.md)** — key architectural decisions
+- **[API Endpoints](docs/README.md#api-endpoints)** — full endpoint reference
+
 ## Tips
 
 - Use `model_to_dict` from `playhouse.shortcuts` to convert model instances to dictionaries for JSON responses.
