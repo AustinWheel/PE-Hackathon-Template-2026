@@ -2,6 +2,12 @@
 
 A production-grade URL shortener built for the MLH Production Engineering Hackathon. The focus is on reliability, scalability, and observability — not just functionality.
 
+
+
+https://github.com/user-attachments/assets/06abc325-e31a-4f76-8285-926bf5e79c94
+
+
+
 **Stack:** Flask · Gunicorn · PostgreSQL · Redis · Prometheus · Grafana · Loki · k6
 
 https://github.com/user-attachments/assets/overview-compressed.mp4
@@ -22,7 +28,9 @@ graph LR
 ```
 
 **Production:** https://pe-hackathon-hni9m.ondigitalocean.app
+
 **Staging:** https://pe-hackathon-staging-stj5i.ondigitalocean.app
+
 **Grafana:** http://143.198.173.164:3000
 
 ## Quick Start
