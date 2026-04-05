@@ -34,14 +34,10 @@ import { format } from "date-fns";
 const COLORS = ["#22c55e", "#3b82f6", "#eab308", "#ef4444", "#a855f7"];
 
 const QUERIES = {
-  traffic: 'sum(rate(http_requests_total[1m])) by (job)',
-  errorRate: `(
-    sum by (job) (rate(http_errors_total[2m]))
-    / clamp_min(sum by (job) (rate(http_requests_total[2m])), 0.001)
-  ) * 100`,
-  latencyP50: `histogram_quantile(0.50, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))`,
-  latencyP95: `histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))`,
-  latencyP99: `histogram_quantile(0.99, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))`,
+  traffic: "sum(rate(http_requests_total[1m])) by (job)",
+  errorRate: "(sum by (job) (rate(http_errors_total[2m])) / clamp_min(sum by (job) (rate(http_requests_total[2m])), 0.001)) * 100",
+  latencyP95: "histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
+  latencyP50: "histogram_quantile(0.50, sum by (le, job) (rate(http_request_duration_seconds_bucket[5m])))",
   cpu: "system_cpu_percent",
   memory: "system_memory_percent",
 };
@@ -72,7 +68,7 @@ function MetricChart({
   unit?: string;
   type?: "line" | "area";
 }) {
-  const { data, isLoading } = usePrometheus(query, range);
+  const { data, isLoading, error: fetchError } = usePrometheus(query, range);
   const chartData = data ? parsePrometheusResponse(data) : [];
   const series = chartData.length
     ? Object.keys(chartData[0]).filter((k) => k !== "time")
@@ -87,6 +83,10 @@ function MetricChart({
         {isLoading ? (
           <div className="flex h-[200px] items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+          </div>
+        ) : fetchError ? (
+          <div className="flex h-[200px] items-center justify-center text-sm text-destructive">
+            Failed to load
           </div>
         ) : chartData.length === 0 ? (
           <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
@@ -256,8 +256,8 @@ export default function MetricsPage() {
           unit="%"
         />
         <MetricChart
-          title="Latency P50 / P99"
-          query={QUERIES.latencyP99}
+          title="Latency P50 (seconds)"
+          query={QUERIES.latencyP50}
           range={range}
           unit="s"
         />
