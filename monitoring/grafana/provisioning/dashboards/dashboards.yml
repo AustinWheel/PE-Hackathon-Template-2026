@@ -4,5 +4,8 @@ providers:
   - name: Default
     folder: ""
     type: file
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
     options:
       path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
