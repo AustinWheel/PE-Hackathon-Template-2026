@@ -6,15 +6,18 @@
 package_update: true
 packages:
   - docker.io
-  - docker-compose
+  - docker-compose-v2
   - git
   - curl
 
 runcmd:
+  # Enable Docker
+  - systemctl enable --now docker
+
   # Clone repo
   - git clone https://github.com/AustinWheel/chaos-monkey.git /opt/app
 
-  # Seed the database
+  # Build and start
   - cd /opt/app && docker compose -f app-droplet/docker-compose.yml up -d --build
   - sleep 15
   - cd /opt/app && docker compose -f app-droplet/docker-compose.yml exec -T app uv run python seed.py

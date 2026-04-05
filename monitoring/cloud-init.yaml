@@ -7,7 +7,7 @@
 package_update: true
 packages:
   - docker.io
-  - docker-compose
+  - docker-compose-v2
   - python3
   - curl
 
