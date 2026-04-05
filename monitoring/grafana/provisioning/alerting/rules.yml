@@ -1,0 +1,414 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Service Health
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: service-down-nyc
+        title: Service Down — Prod NYC
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: app_up{job="flask-prod-nyc"}
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prod NYC is unreachable
+
+      - uid: service-down-sfo
+        title: Service Down — Prod SFO
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: app_up{job="flask-prod-sfo"}
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prod SFO is unreachable
+
+      - uid: service-down-staging
+        title: Service Down — Staging
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: app_up{job="flask-staging"}
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Staging is unreachable
+
+  - orgId: 1
+    name: Error Rate
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: high-error-rate-prod
+        title: High Error Rate — Prod
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                sum(rate(http_errors_total{environment="prod"}[2m]))
+                / clamp_min(sum(rate(http_requests_total{environment="prod"}[2m])), 0.001)
+                * 100
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prod error rate is above 10%"
+
+      - uid: critical-error-rate-prod
+        title: Critical Error Rate — Prod
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                sum(rate(http_errors_total{environment="prod"}[2m]))
+                / clamp_min(sum(rate(http_requests_total{environment="prod"}[2m])), 0.001)
+                * 100
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [25]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prod error rate is above 25% — possible outage"
+
+  - orgId: 1
+    name: Latency
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: high-latency-p95
+        title: High P95 Latency — Prod
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                histogram_quantile(0.95,
+                  sum by (le) (rate(http_request_duration_seconds_bucket{environment="prod"}[5m]))
+                )
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [2]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency above 2s in production"
+
+      - uid: high-latency-p99
+        title: Extreme P99 Latency — Prod
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                histogram_quantile(0.99,
+                  sum by (le) (rate(http_request_duration_seconds_bucket{environment="prod"}[5m]))
+                )
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P99 latency above 5s — severe degradation"
+
+  - orgId: 1
+    name: Infrastructure
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: high-cpu-prod
+        title: High CPU Usage — Prod
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: max(system_cpu_percent{environment="prod"})
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU usage above 80% on a prod instance"
+
+      - uid: high-memory-prod
+        title: High Memory Usage — Prod
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: max(system_memory_percent{environment="prod"})
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory usage above 85% on a prod instance"
+
+      - uid: high-saturation-prod
+        title: High Request Saturation — Prod
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(http_requests_in_flight{environment="prod"})
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [50]
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+              expression: A
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 50 in-flight requests — nearing saturation"

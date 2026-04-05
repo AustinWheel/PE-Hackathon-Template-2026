@@ -1,0 +1,17 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: discord
+    receivers:
+      - uid: discord-webhook
+        type: discord
+        settings:
+          url: "https://discord.com/api/webhooks/1489813519560868031/VnmqUl_1xxH5XaDNC6m0JuxEk0YX-6-yw5qtLkXKXIgSxNX-BYfgaP6AM7EuQO7cmK6B"
+          use_discord_username: true
+          message: |
+            {{ range .Alerts }}
+            **{{ .Labels.alertname }}** — {{ .Status | toUpper }}
+            Severity: {{ .Labels.severity }}
+            {{ .Annotations.summary }}
+            {{ end }}
