@@ -9,13 +9,13 @@ services:
       deploy_on_push: false
     dockerfile_path: Dockerfile
     http_port: 8080
-    instance_size_slug: apps-d-1vcpu-0.5gb
+    instance_size_slug: apps-d-1vcpu-1gb
     autoscaling:
       min_instance_count: 3
       max_instance_count: 15
       metrics:
         cpu:
-          percent: 70
+          percent: 50
     health_check:
       http_path: /health
       initial_delay_seconds: 10
