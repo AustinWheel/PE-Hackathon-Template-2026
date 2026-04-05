@@ -16,6 +16,9 @@ dependencies = [
     "redis>=7.4.0",
 ]
 
+[tool.pytest.ini_options]
+addopts = "--ignore=tests/test_e2e_smoke.py"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",

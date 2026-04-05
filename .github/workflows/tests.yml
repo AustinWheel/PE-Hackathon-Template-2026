@@ -32,6 +32,48 @@ jobs:
         with:
           pytest-xml-coverage-path: coverage.xml
 
+  e2e-staging:
+    name: E2E Smoke Tests (Staging)
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Deploy PR to staging
+        run: doctl apps create-deployment ${{ secrets.DO_STAGING_APP_ID }} --wait
+
+      - name: Wait for staging health
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.STAGING_APP_URL }}/health)
+            if [ "$STATUS" = "200" ]; then echo "Staging healthy!"; exit 0; fi
+            echo "Attempt $i: status=$STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "Staging unhealthy after 5 minutes"
+          exit 1
+
+      - name: Run E2E smoke tests
+        env:
+          BASE_URL: ${{ secrets.STAGING_APP_URL }}
+        run: uv run pytest tests/test_e2e_smoke.py -v
+
   deploy-staging:
     needs: test
     runs-on: ubuntu-latest
@@ -50,13 +92,9 @@ jobs:
 
       - name: Verify staging health
         run: |
-          echo "Waiting for staging to be healthy..."
           for i in $(seq 1 30); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.STAGING_APP_URL }}/health)
-            if [ "$STATUS" = "200" ]; then
-              echo "Staging healthy!"
-              exit 0
-            fi
+            if [ "$STATUS" = "200" ]; then echo "Staging healthy!"; exit 0; fi
             echo "Attempt $i: status=$STATUS, retrying in 10s..."
             sleep 10
           done
@@ -81,13 +119,9 @@ jobs:
 
       - name: Verify prod health
         run: |
-          echo "Waiting for prod to be healthy..."
           for i in $(seq 1 30); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.APP_URL }}/health)
-            if [ "$STATUS" = "200" ]; then
-              echo "Prod healthy!"
-              exit 0
-            fi
+            if [ "$STATUS" = "200" ]; then echo "Prod healthy!"; exit 0; fi
             echo "Attempt $i: status=$STATUS, retrying in 10s..."
             sleep 10
           done
