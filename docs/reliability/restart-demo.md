@@ -1,58 +1,69 @@
 # Service Restart Demo Script
 
 ## What we're demonstrating
-When an app instance crashes, App Platform automatically restarts it. We use `/chaos/kill` to terminate the process — App Platform detects the container died and spins up a replacement. The other instance keeps serving traffic, so there's zero downtime.
+When an app instance crashes, Docker's `restart: always` policy automatically restarts it. We kill the main process inside a container to simulate a crash — Docker detects the exit and spins up a replacement. The other instances keep serving traffic through the nginx load balancer, so there's zero downtime.
 
 ## Setup
 
-Open 2 windows:
-
-1. **Terminal** — health check loop showing instance IDs
-2. **Browser** — DigitalOcean App Platform dashboard → pe-hackathon → Runtime Logs
+Open a terminal in the project root with the local stack running:
+```bash
+docker compose up -d
+```
 
 ## Steps
 
-### 1. Show both instances are healthy (~10s)
+### 1. Show all 3 instances running
 
-Run this to see which instances are serving:
 ```bash
-while true; do
-  curl -s https://pe-hackathon-hni9m.ondigitalocean.app/health | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print(f\"{d['instance_id']}  uptime={d['uptime_seconds']}s  status={d['status']}\")"
-  sleep 2
-done
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep app
 ```
 
-You'll see two different `instance_id` values alternating (load balancer round-robins). Both show high uptime.
-
-### 2. Kill one instance
-
-In a second terminal:
-```bash
-curl -s https://pe-hackathon-hni9m.ondigitalocean.app/chaos/kill | python3 -m json.tool
+Expected output — all 3 instances up:
+```
+hackathon-app3-1    Up 5 minutes
+hackathon-app2-1    Up 5 minutes
+hackathon-app1-1    Up 5 minutes
 ```
 
-Note the `pid` in the response — that process will terminate in 2 seconds.
+### 2. Verify health works
 
-### 3. Show recovery (~30s)
+```bash
+curl -s http://localhost:8080/health | python3 -m json.tool
+```
 
-Switch back to the first terminal. You'll see:
-- One of the `instance_id` values disappears temporarily
-- All requests still return `200` (the surviving instance handles everything)
-- A **new** `instance_id` appears with `uptime_seconds` near 0 — that's the restarted instance
+### 3. Crash an instance
 
-### 4. Show DO Runtime Logs
+Kill the main process (PID 1) inside app1. This simulates an unexpected crash:
+```bash
+docker exec hackathon-app1-1 /bin/sh -c 'kill 1'
+```
 
-Switch to the App Platform dashboard. The Runtime Logs will show:
-- The killed instance's gunicorn worker exiting
-- A new container starting up with fresh gunicorn worker PIDs
+### 4. Show it restarted automatically
+
+Run immediately after the kill:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep app
+```
+
+Expected output — app1 restarted, others unaffected:
+```
+hackathon-app3-1    Up 5 minutes
+hackathon-app2-1    Up 5 minutes
+hackathon-app1-1    Up 2 seconds
+```
+
+### 5. Health still works (zero downtime)
+
+```bash
+curl -s http://localhost:8080/health | python3 -m json.tool
+```
+
+Nginx routed traffic to app2 and app3 while app1 was restarting. No requests were dropped.
 
 ## Key points to narrate
 
-- "We have 2 instances behind the load balancer — here are their instance IDs"
-- "I'm killing one instance's process"
-- "The load balancer routes all traffic to the surviving instance — no downtime"
-- "App Platform detects the crash and starts a new instance automatically"
-- "Here's the new instance with a fresh ID and zero uptime"
+- "We have 3 app instances behind nginx, all with `restart: always`"
+- "I'm killing the main process inside one container to simulate a crash"
+- "Docker detects the crash and restarts it automatically — here it is, 2 seconds old"
+- "The other two instances kept serving traffic the whole time — zero downtime"
+- "This is the same behavior in production: App Platform restarts crashed containers automatically"
