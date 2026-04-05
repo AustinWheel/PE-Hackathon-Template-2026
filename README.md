@@ -1,205 +1,166 @@
-# MLH PE Hackathon — Flask + Peewee + PostgreSQL Template
+# PE Hackathon — URL Shortener
 
-A minimal hackathon starter template. You get the scaffolding and database wiring — you build the models, routes, and CSV loading logic.
+A production-grade URL shortener built for the MLH Production Engineering Hackathon. The focus is on reliability, scalability, and observability — not just functionality.
 
-**Stack:** Flask · Peewee ORM · PostgreSQL · uv
+**Stack:** Flask · Gunicorn · PostgreSQL · Redis · Prometheus · Grafana · Loki · k6
 
-## **Important**
+https://github.com/user-attachments/assets/overview-compressed.mp4
 
-You need to work with around the seed files that you can find in [MLH PE Hackathon](https://mlh-pe-hackathon.com) platform. This will help you build the schema for the database and have some data to do some testing and submit your project for judging. If you need help with this, reach out on Discord or on the Q&A tab on the platform.
+## Architecture
 
-## Prerequisites
+```
+┌─────────────────────────────────────────────────┐
+│         DO App Platform (NYC)                    │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐      │
+│   │ Instance 1│  │ Instance 2│  │ Instance 3│     │
+│   │ 6 workers │  │ 6 workers │  │ 6 workers │     │
+│   └─────┬─────┘  └─────┬─────┘  └─────┬─────┘    │
+│         └───────────┬───────────────┘             │
+│              Load Balancer (HTTPS)                │
+└──────────────┬──────────────┬─────────────────────┘
+               │              │
+    ┌──────────▼───┐  ┌───────▼────────┐
+    │ Managed PG 16│  │ Managed Redis 8│
+    │ hackathon-db │  │ hackathon-redis│
+    └──────────────┘  └────────────────┘
 
-- **uv** — a fast Python package manager that handles Python versions, virtual environments, and dependencies automatically.
-  Install it with:
-  ```bash
-  # macOS / Linux
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+┌──────────────────────────────────────────────────┐
+│      Monitoring Droplet (143.198.173.164)         │
+│  Prometheus :9090 │ Grafana :3000 │ Loki :3100    │
+│  Synthetic Traffic (24/7) │ Chaos Monkey (5min)   │
+└──────────────────────────────────────────────────┘
+```
 
-  # Windows (PowerShell)
-  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-  ```
-  For other methods see the [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/).
-- PostgreSQL running locally (you can use Docker or a local instance)
-
-## uv Basics
-
-`uv` manages your Python version, virtual environment, and dependencies automatically — no manual `python -m venv` needed.
-
-| Command | What it does |
-|---------|--------------|
-| `uv sync` | Install all dependencies (creates `.venv` automatically) |
-| `uv run <script>` | Run a script using the project's virtual environment |
-| `uv add <package>` | Add a new dependency |
-| `uv remove <package>` | Remove a dependency |
+**Production:** https://pe-hackathon-hni9m.ondigitalocean.app
+**Staging:** https://pe-hackathon-staging-stj5i.ondigitalocean.app
+**Grafana:** http://143.198.173.164:3000
 
 ## Quick Start
 
 ```bash
-# 1. Clone the repo
-git clone <repo-url> && cd mlh-pe-hackathon
-
-# 2. Install dependencies
+# Clone and install
+git clone https://github.com/AustinWheel/chaos-monkey.git && cd chaos-monkey
 uv sync
 
-# 3. Create the database
-createdb hackathon_db
+# Option 1: Docker (recommended) — runs app + db + redis + nginx + monitoring
+docker compose up -d
+# App: http://localhost:8080
+# Grafana: http://localhost:3000
 
-# 4. Configure environment
-cp .env.example .env   # edit if your DB credentials differ
-
-# 5. Run the server
-uv run run.py
-
-# 6. Verify
-curl http://localhost:5000/health
-# → {"status":"ok"}
+# Option 2: Local dev (requires local Postgres)
+cp .env.example .env  # edit DB credentials
+uv run python run.py
+# App: http://localhost:5001
 ```
+
+## Running Tests
+
+```bash
+# Unit + integration tests (132 tests, 75% coverage)
+uv run pytest tests/ -v --cov=app
+
+# E2E smoke tests against a live deployment
+BASE_URL=https://pe-hackathon-hni9m.ondigitalocean.app uv run pytest tests/test_e2e_smoke.py -v
+
+# Load tests (requires k6)
+k6 run --env BASE_URL=https://pe-hackathon-hni9m.ondigitalocean.app loadtests/baseline.js  # 50 users
+k6 run --env BASE_URL=https://pe-hackathon-hni9m.ondigitalocean.app loadtests/silver.js    # 200 users
+k6 run --env BASE_URL=https://pe-hackathon-hni9m.ondigitalocean.app loadtests/gold.js      # 500 users
+```
+
+## CI/CD
+
+Every push triggers the pipeline in `.github/workflows/tests.yml`:
+
+| Trigger | What runs |
+|---|---|
+| PR to `main` | Tests + coverage → deploy to staging → e2e smoke tests |
+| Push to `main` | Tests + coverage → deploy to production → health verification |
+| Push to `staging` | Tests + coverage → deploy to staging → health verification |
+
+Deploys are blocked if tests fail.
+
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health` | Health check (200 OK / 503 degraded) |
+| GET | `/metrics` | System metrics (CPU, memory) |
+| GET | `/prom-metrics` | Prometheus exposition format |
+| GET/POST | `/users` | List / create users |
+| GET/PUT | `/users/:id` | Get / update user |
+| GET/POST | `/urls` | List / create short URLs |
+| GET/PUT | `/urls/:id` | Get / update URL |
+| GET | `/r/:code` | Redirect to original URL |
+| GET/POST | `/products` | List / create products |
+| GET | `/events` | List analytics events |
+| GET/POST | `/alerts` | List / create alerts |
+| PUT | `/alerts/:id` | Update alert status |
+| GET | `/logs` | Query structured logs |
+| GET | `/loadtest/results` | Load test result history |
+
+### Chaos Engineering Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/chaos/error` | Simulate a 500 error |
+| GET | `/chaos/error-flood?count=N` | Generate N errors (returns 500) |
+| GET | `/chaos/cpu?duration=N&threads=N` | CPU spike |
+| GET | `/chaos/latency?delay=N` | Inject latency |
+| GET | `/chaos/health-fail?duration=N` | Make /health return 503 |
+| GET | `/chaos/kill?delay=N` | Kill the instance process |
+| GET | `/chaos/critical` | Send critical alert to Discord |
 
 ## Project Structure
 
 ```
-mlh-pe-hackathon/
 ├── app/
-│   ├── __init__.py          # App factory (create_app)
-│   ├── database.py          # DatabaseProxy, BaseModel, connection hooks
-│   ├── models/
-│   │   └── __init__.py      # Import your models here
-│   └── routes/
-│       └── __init__.py      # register_routes() — add blueprints here
-├── .env.example             # DB connection template
-├── .gitignore               # Python + uv gitignore
-├── .python-version          # Pin Python version for uv
-├── pyproject.toml           # Project metadata + dependencies
-├── run.py                   # Entry point: uv run run.py
-└── README.md
+│   ├── __init__.py          # App factory, middleware, health endpoint
+│   ├── database.py          # Pooled Postgres connection
+│   ├── cache.py             # Redis caching with graceful degradation
+│   ├── loki_handler.py      # Async log shipping to Loki
+│   ├── models/              # Peewee ORM models
+│   └── routes/              # Flask blueprints
+├── monitoring/
+│   ├── docker-compose.yml   # Prometheus + Grafana + Loki + Alertmanager
+│   ├── prometheus.yml       # Scrape config
+│   ├── cloud-init.yaml      # Droplet bootstrap
+│   └── grafana/provisioning/
+│       ├── dashboards/      # Overview + Logs dashboards (JSON)
+│       ├── datasources/     # Prometheus + Loki
+│       └── alerting/        # 9 alert rules + Discord contact point
+├── loadtests/               # k6 scripts (baseline, silver, gold, stress)
+├── scripts/
+│   ├── synthetic_traffic.py # 24/7 traffic generation
+│   ├── chaos_monkey.py      # Automated failure injection
+│   └── update-monitoring.sh # Deploy monitoring changes
+├── tests/                   # 132 tests (unit, integration, e2e)
+├── docs/                    # Full documentation index
+├── docker-compose.yml       # Local dev: 3 app instances + nginx + db + redis
+├── Dockerfile               # Production image
+└── .do/app.yaml             # App Platform spec
 ```
 
-## How to Add a Model
+## Documentation
 
-1. Create a file in `app/models/`, e.g. `app/models/product.py`:
+See [`docs/README.md`](docs/README.md) for the full index:
 
-```python
-from peewee import CharField, DecimalField, IntegerField
+- [Deployment Guide](docs/deployment.md) — deploy, rollback, manage environments
+- [Observability Guide](docs/observability/observability.md) — monitoring, metrics, logging, alerting
+- [Runbook](docs/observability/runbook.md) — incident response procedures
+- [Failure Modes](docs/reliability/failure-modes.md) — known failures and recovery
+- [Capacity Plan](docs/scalability/capacity-plan.md) — scaling strategy and limits
+- [Decision Log](docs/decisions.md) — architectural decisions
+- [Verification](docs/verification.md) — quest evidence and screenshots
 
-from app.database import BaseModel
+## Environment Variables
 
+| Variable | Description | Default |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string | — |
+| `REDIS_URL` | Redis connection string | — (graceful degradation) |
+| `FLASK_DEBUG` | Enable debug mode | `false` |
+| `APP_ENVIRONMENT` | `prod` / `staging` / `dev` | `dev` |
+| `LOKI_URL` | Loki push endpoint | — (disabled if unset) |
 
-class Product(BaseModel):
-    name = CharField()
-    category = CharField()
-    price = DecimalField(decimal_places=2)
-    stock = IntegerField()
-```
-
-2. Import it in `app/models/__init__.py`:
-
-```python
-from app.models.product import Product
-```
-
-3. Create the table (run once in a Python shell or a setup script):
-
-```python
-from app.database import db
-from app.models.product import Product
-
-db.create_tables([Product])
-```
-
-## How to Add Routes
-
-1. Create a blueprint in `app/routes/`, e.g. `app/routes/products.py`:
-
-```python
-from flask import Blueprint, jsonify
-from playhouse.shortcuts import model_to_dict
-
-from app.models.product import Product
-
-products_bp = Blueprint("products", __name__)
-
-
-@products_bp.route("/products")
-def list_products():
-    products = Product.select()
-    return jsonify([model_to_dict(p) for p in products])
-```
-
-2. Register it in `app/routes/__init__.py`:
-
-```python
-def register_routes(app):
-    from app.routes.products import products_bp
-    app.register_blueprint(products_bp)
-```
-
-## How to Load CSV Data
-
-```python
-import csv
-from peewee import chunked
-from app.database import db
-from app.models.product import Product
-
-def load_csv(filepath):
-    with open(filepath, newline="") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-
-    with db.atomic():
-        for batch in chunked(rows, 100):
-            Product.insert_many(batch).execute()
-```
-
-## Useful Peewee Patterns
-
-```python
-from peewee import fn
-from playhouse.shortcuts import model_to_dict
-
-# Select all
-products = Product.select()
-
-# Filter
-cheap = Product.select().where(Product.price < 10)
-
-# Get by ID
-p = Product.get_by_id(1)
-
-# Create
-Product.create(name="Widget", category="Tools", price=9.99, stock=50)
-
-# Convert to dict (great for JSON responses)
-model_to_dict(p)
-
-# Aggregations
-avg_price = Product.select(fn.AVG(Product.price)).scalar()
-total = Product.select(fn.SUM(Product.stock)).scalar()
-
-# Group by
-from peewee import fn
-query = (Product
-         .select(Product.category, fn.COUNT(Product.id).alias("count"))
-         .group_by(Product.category))
-```
-
-## Production Engineering Documentation
-
-See [`docs/README.md`](docs/README.md) for the full documentation index, including:
-
-- **[Architecture Diagram](docs/README.md#architecture)** — system overview with Mermaid diagram
-- **[Deployment Guide](docs/deployment.md)** — deploy, rollback, manage environments
-- **[Observability Guide](docs/observability/observability.md)** — monitoring, metrics, logging, alerting
-- **[Runbook](docs/observability/runbook.md)** — incident response procedures
-- **[Failure Modes](docs/reliability/failure-modes.md)** — known failures and recovery
-- **[Capacity Plan](docs/scalability/capacity-plan.md)** — scaling strategy and limits
-- **[Decision Log](docs/decisions.md)** — key architectural decisions
-- **[API Endpoints](docs/README.md#api-endpoints)** — full endpoint reference
-
-## Tips
-
-- Use `model_to_dict` from `playhouse.shortcuts` to convert model instances to dictionaries for JSON responses.
-- Wrap bulk inserts in `db.atomic()` for transactional safety and performance.
-- The template uses `teardown_appcontext` for connection cleanup, so connections are closed even when requests fail.
-- Check `.env.example` for all available configuration options.
+See [`.env.example`](.env.example) for the full list.
