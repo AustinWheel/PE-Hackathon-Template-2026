@@ -91,6 +91,44 @@ def chaos_health_fail():
     return jsonify({"chaos": "health_fail", "duration_seconds": duration, "status": "health check will return 503"})
 
 
+@chaos_bp.route("/chaos/kill")
+def chaos_kill():
+    """Kill this instance's process. App Platform will restart it automatically."""
+    import os
+    import signal
+
+    delay = min(request.args.get("delay", 2, type=int), 10)
+
+    logger.critical(
+        "Chaos: process will be killed in %ds",
+        delay,
+        extra={"component": "chaos", "delay": delay},
+    )
+
+    Alert.create(
+        alert_name="ProcessKill",
+        severity="critical",
+        status="firing",
+        summary=f"Process killed via chaos endpoint (delay={delay}s)",
+        source="chaos/kill",
+        fired_at=datetime.utcnow(),
+    )
+
+    def _kill():
+        time.sleep(delay)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    t = threading.Thread(target=_kill, daemon=True)
+    t.start()
+
+    return jsonify({
+        "chaos": "kill",
+        "delay_seconds": delay,
+        "pid": os.getpid(),
+        "status": f"process will terminate in {delay}s",
+    })
+
+
 @chaos_bp.route("/chaos/error-flood")
 def chaos_error_flood():
     """Generate a burst of errors to trigger 'High Error Rate' alerts."""
