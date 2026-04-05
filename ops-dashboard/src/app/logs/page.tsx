@@ -74,8 +74,7 @@ function buildLogQuery(filters: {
   const pipelineParts: string[] = [];
 
   if (filters.servicePath) {
-    const escaped = filters.servicePath.replace("/", "\\/");
-    pipelineParts.push('|~ "' + '"path":\\\\s*"' + escaped + '"');
+    pipelineParts.push('|= `"path": "' + filters.servicePath + '`');
   }
 
   if (filters.search) {
