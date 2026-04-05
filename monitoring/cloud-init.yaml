@@ -1,0 +1,103 @@
+#cloud-config
+# Cloud-init for the monitoring droplet.
+# Set as user data when creating the droplet — it runs automatically on first boot
+# and fully bootstraps Prometheus, Loki, AlertManager, Grafana, synthetic traffic,
+# and chaos monkey without any manual SSH.
+
+package_update: true
+packages:
+  - docker.io
+  - docker-compose
+  - python3
+  - curl
+
+write_files:
+  # --- Synthetic traffic service ---
+  - path: /etc/systemd/system/synthetic-traffic.service
+    content: |
+      [Unit]
+      Description=Synthetic Traffic Generator
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      WorkingDirectory=/root
+      ExecStart=/usr/bin/python3 /root/synthetic_traffic.py
+      Restart=always
+      RestartSec=5
+      Environment=PROD_NYC_URL=https://pe-hackathon-muy5v.ondigitalocean.app
+      Environment=PROD_SFO_URL=https://pe-hackathon-prod-sfo-wkpqr.ondigitalocean.app
+      Environment=STAGING_URL=https://pe-hackathon-staging-f28oj.ondigitalocean.app
+      Environment=INTERVAL_SECONDS=3
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # --- Chaos monkey service (oneshot, triggered by timer) ---
+  - path: /etc/systemd/system/chaos-monkey.service
+    content: |
+      [Unit]
+      Description=Chaos Monkey Run
+
+      [Service]
+      Type=oneshot
+      WorkingDirectory=/root
+      ExecStart=/usr/bin/python3 /root/chaos_monkey.py
+      Environment=PROD_NYC_URL=https://pe-hackathon-muy5v.ondigitalocean.app
+      Environment=PROD_SFO_URL=https://pe-hackathon-prod-sfo-wkpqr.ondigitalocean.app
+      Environment=ALERTMANAGER_URL=http://localhost:9093
+      Environment=CHAOS_INTERVAL_SECONDS=0
+
+  # --- Chaos monkey timer (every 5 minutes) ---
+  - path: /etc/systemd/system/chaos-monkey.timer
+    content: |
+      [Unit]
+      Description=Run Chaos Monkey every 5 minutes
+
+      [Timer]
+      OnBootSec=1min
+      OnUnitActiveSec=5min
+      AccuracySec=10s
+
+      [Install]
+      WantedBy=timers.target
+
+  # --- Script auto-updater service ---
+  - path: /etc/systemd/system/script-updater.service
+    content: |
+      [Unit]
+      Description=Update traffic scripts from GitHub
+
+      [Service]
+      Type=oneshot
+      WorkingDirectory=/root
+      ExecStart=/bin/bash -c 'curl -sf -o /root/synthetic_traffic.py https://raw.githubusercontent.com/AustinWheel/chaos-monkey/main/scripts/synthetic_traffic.py && curl -sf -o /root/chaos_monkey.py https://raw.githubusercontent.com/AustinWheel/chaos-monkey/main/scripts/chaos_monkey.py && systemctl restart synthetic-traffic'
+
+  # --- Script auto-updater timer (every 10 minutes) ---
+  - path: /etc/systemd/system/script-updater.timer
+    content: |
+      [Unit]
+      Description=Check for script updates every 10 minutes
+
+      [Timer]
+      OnBootSec=1min
+      OnUnitActiveSec=10min
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  # Clone repo and start monitoring stack
+  - git clone https://github.com/AustinWheel/chaos-monkey.git /opt/monitoring-repo
+  - cd /opt/monitoring-repo/monitoring && docker-compose up -d
+
+  # Download scripts
+  - curl -sf -o /root/synthetic_traffic.py https://raw.githubusercontent.com/AustinWheel/chaos-monkey/main/scripts/synthetic_traffic.py
+  - curl -sf -o /root/chaos_monkey.py https://raw.githubusercontent.com/AustinWheel/chaos-monkey/main/scripts/chaos_monkey.py
+
+  # Enable and start all services
+  - systemctl daemon-reload
+  - systemctl enable --now synthetic-traffic.service
+  - systemctl enable --now chaos-monkey.timer
+  - systemctl enable --now script-updater.timer
